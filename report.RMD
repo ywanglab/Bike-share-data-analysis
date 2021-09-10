@@ -1,0 +1,577 @@
+---
+title: "How Does a Bike-Share Navigate Speedy Success?"
+author: "Yi Wang"
+date: "9/7/2021"
+output:
+  pdf_document: 
+    fig_caption: yes
+    number_sections: yes
+    
+  
+    
+urlcolor: blue     
+---
+
+
+```{r load r package, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(here)
+library(skimr)
+library(janitor)
+library(lubridate)
+```
+
+
+
+
+# ASK 
+
+## What is the problem you are trying to solve?
+
+How do annual members and casual riders use Cyclistic's bikes differently?
+
+## How can your insights drive business decisions?
+The analysis finding may be used for the company to make decisions as to influence casual riders to become members. 
+
+## (Deliverable) A clear statement of the business task
+Identify the difference of  annual members and casual riders using Cyclistic's bikes. 
+
+
+# PREPARE 
+
+
+
+
+
+
+##	Where is your data located? 
+
+We will use Cyclistic’s historical trip data: the previous [12 months of Cyclistic trip data](https://divvy-tripdata.s3.amazonaws.com/index.html)  to analyze and identify trends.   The data has been made available by Motivate International Inc. under this [license](https://www.divvybikes.com/data-license-agreement).) This is public data that can be used to explore how different customer types are using Cyclistic bikes. 
+
+Four zipped data sets (Q2, Q3, Q4 of 2019 and Q1 of 2020) are downloaded to a local folder named `data` and unzipped. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, include=FALSE}
+Q2_2019 <-  read_csv("./data/R_analysis_data/Divvy_Trips_2019_Q2.csv")
+
+Q3_2019 <-  read_csv("./data/R_analysis_data/Divvy_Trips_2019_Q3.csv")
+
+Q4_2019 <-  read_csv("./data/R_analysis_data/Divvy_Trips_2019_Q3.csv")
+
+Q1_2020 <-  read_csv("./data/R_analysis_data/Divvy_Trips_2020_Q1.csv")
+
+```
+
+
+##	How is the data organized? 
+It appears that the four data sets are not organized in the same way. We next skim each data set. 
+```{r}
+head(Q2_2019)
+skim_without_charts(Q2_2019)
+colnames(Q2_2019)
+```
+
+For the data set of 2019_Q2, it is organized by ascending `Rental ID` which is also ordered in the ascending order of `Start Time` of a trip. 
+
+```{r}
+head(Q3_2019)
+skim_without_charts(Q3_2019)
+colnames(Q3_2019)
+
+head(Q4_2019)
+skim_without_charts(Q4_2019)
+colnames(Q4_2019)
+
+```
+
+For the data sets of 2019_Q3 and 2019_Q4, they are organized by ascending `trip_id` which is also ordered in the ascending order of `start_time` of a trip. 
+
+```{r}
+head(Q1_2020)
+glimpse(Q1_2020)
+skim_without_charts(Q1_2020)
+colnames(Q1_2020)
+```
+For the data sets of 2020_Q1, it appears the data are not organized at all. The bike rental records seem to appear in random order in the data file. 
+
+
+
+
+##	Are there issues with bias or credibility in this data? Does your data ROCCC?   
+
+It appears there is no issue of bias or credibility in the data set. However, we notice that from the reports by `skim_without_charts`, the three data sets for 2019 have missing values in the columns of `gendre` and `birthyear`, and the data set Q1-2020 has one missing value in four columns regarding `end_station`. We will find out more about the missing values and determine how to deal with them. 
+
+##	How are you addressing licensing, privacy, security, and accessibility? 
+
+Note that data-privacy issues prohibit one from using riders’ personally identifiable information. This means that it is not possible to connect pass purchases to credit card numbers to determine if casual riders live in the Cyclistic service area or if they have purchased multiple 
+single passes.
+
+ The data has been made available by Motivate International Inc. under this [license](https://www.divvybikes.com/data-license-agreement).) This is public data that can be used to explore how different customer types are using Cyclistic bikes. 
+
+##	How did you verify the data’s integrity?
+We need to  examine the following: 
+1. if there are missing values in a data set, where they are and how to handle them. 
+2. if the four data sets have consistent columns:column names and column data type. 
+
+
+
+##	How does it help you answer your question?
+
+Checking data integrity is important to make sure what data is used to process, and allow combining the four data sets into one data set to analyze. 
+
+##	Are there any problems with the data?
+
+A quick glance of the data indicates that there are some differences among the four data files. The three data sets for 2019 have the same number of columns, but 2019-Q2 uses different column names. 2019-Q3 and 2019-Q4 use identical column names. The good news is that the column names of 2019-Q2 match the corresponding column names in 2019-Q3 and 2019-Q4 in terms what information is recorded in each column. 
+
+2020-Q1   has one more column compared to the other three files. Not only it uses different column names, it doesn't have the exact matching columns. But it does contain the essential columns that we need for this analysis. 
+
+A quick glance of the data indicates there is no obvious bias or credibility in the data. However, the column `gender` and `birthyear` has some missing values for small number of records. Those missing values may not be significant for our task. 
+
+
+## (Deliverable) A description of all data sources used
+
+The Cyclistic’s historical trip data: the previous [12 months of Cyclistic trip data](https://divvy-tripdata.s3.amazonaws.com/index.html)  is used.    The data has been made available by Motivate International Inc. under this [license](https://www.divvybikes.com/data-license-agreement).) This is public data that can be used to explore how different customer types are using Cyclistic bikes. 
+
+# PROCESS 
+
+
+##	What tools are you choosing and why? 
+I decided to use R, as  R can provide more powerful tools. Besides  the data set is large. When using Excel to open the  files Q2-2019 and Q3-2019, the Excel reports that the file is not loaded completely. This is because  the data set exceeds the limit of 1,048,576 rows for Excel to process.  On the other hand, R can readily hand much larger a data set. 
+
+##	Have you ensured your data’s integrity?
+To this end, we first check if there are missing values (`NA`) in the data sets. 
+```{r}
+apply(Q2_2019,2, function(x) {sum(is.na(x))})
+```
+```{r}
+apply(Q3_2019,2, function(x) {sum(is.na(x))})
+```
+```{r}
+apply(Q4_2019,2, function(x) {sum(is.na(x))})
+```
+```{r}
+apply(Q1_2020,2, function(x) {sum(is.na(x))})
+```
+It appears that the three data sets for 2019 has missing values, but only in columns of `gendre` and `birthyear` which are not the interest of this analysis hence those missing values will not affect our analysis. 
+
+For the data set Q1_2020, it appears it has only one missing value in each of the columns of `end_station_name`, `end_station_id`,  `end_lat` and `end_lng`. 
+To find out where exactly the missing values are, we perform the following operation: 
+```{r}
+na_rows <- Q1_2020[is.na(Q1_2020$end_station_name),]
+na_rows
+```
+So there is only one row of record with the four missing column values. Due to the desired analysis will not use those information, 
+we  decide to keep  this line of record. 
+
+
+##	What steps have you taken to ensure that your data is clean?
+As mentioned before, the column names need to be unified. We will retain the column names of Q3_2019 and Q4_2019 and change the column names of Q2_2019 and Q1_2020 to the column names used in Q3_2019 and Q4_2019.
+
+We first clean the column names of Q3_2019 and Q4_2019. 
+```{r}
+clean_names(Q3_2019)
+clean_names(Q4_2019)
+```
+We then change the column names of Q2_2019. 
+
+```{r}
+Q2_2019_new <- Q2_2019  # preserve the original data
+colnames(Q2_2019_new) <- colnames(Q3_2019)
+colnames(Q2_2019_new)
+clean_names(Q2_2019_new)
+```
+Since the column names of Q1_2020 do not completely match those of Q3_2019, we need do the renaming one-by_one for Q1_2020. 
+```{r}
+Q1_2020_copy <- Q1_2020 # preserve the original data
+Q1_2020_copy <- Q1_2020_copy %>% 
+                rename(trip_id = ride_id) %>% 
+                rename(start_time = started_at) %>%
+                rename(end_time = ended_at) %>% 
+                rename(from_station_name = start_station_name) %>%
+                rename(from_station_id = start_station_id) %>%
+                rename(to_station_name = end_station_name) %>%
+                rename(to_station_id = end_station_id) %>%
+                rename(usertype = member_casual)
+colnames(Q1_2020_copy)
+clean_names(Q1_2020_copy)
+```
+The Q1_2020 dataset does not have a trip_duration column. We next add this column into the dataset. 
+```{r}
+Q1_2020_copy <- Q1_2020_copy %>% mutate(tripduration = end_time - start_time )
+colnames(Q1_2020_copy)
+```
+We also reorder the columns of Q1_2020  so that the columns  match  those in the other three data sets in the same order. 
+```{r}
+Q1_2020_new <- Q1_2020_copy[,c(1,3,4,2,14,6,5,8,7,13,9,10,11,12)]
+colnames(Q1_2020_new)
+```
+Now the first 10 columns of Q1_2020_new match the first 10 columns of the other three data sets in the same order. And the last four columns of Q1_2020_new do not match the last two columns of the other three data sets. Those columns will not be used in our analysis. 
+
+
+
+
+##	How can you verify that your data is clean and ready to analyze?
+
+We have 
+1. checked the missing values and decided to keep them as the missing column values do not affect our analysis. 
+2. We have renamed the column names of Q2-2019 and Q1_2020 to match those of Q3_2019 and Q4_2019. 
+3. We have reordered the columns of Q1_2020 to match those of the other three data sets in the same order. 
+
+##	Have you documented your cleaning process so you can review and share those results?
+Yes. See what were performed above. 
+
+
+## (Deliverable) Documentation of any cleaning or manipulation of data
+We have performed the following cleaning and manipulation of data.
+1. Checked if there are missing values, and determined the missing values do not affect the desired data analysis. 
+2.  renamed the column names of Q2-2019 and Q1_2020 to match those of Q3_2019 and Q4_2019 so as to enforce all data sets have matching column names. 
+3. reordered the columns of Q1_2020 to match those of the other three data sets in the same order. 
+4. We will check the data type of the matching columns in all four data files to make sure the matching columns of the four data sets have the same type of data in order to combine the four data sets into one data set. 
+
+
+# ANALYZE 
+
+## How should you organize your data to perform analysis on it?
+
+We next join the four data sets into one data set for the ease of processing all data of the past year including the four quarters. As mentioned earlier, due to the discrepancy of columns between Q1_2020 and the other there data sets, only the first 10 columns will be selected. 
+```{r}
+Q2_2019_select <- Q2_2019_new %>% 
+  select(1:10)
+Q3_2019_select <- Q3_2019 %>% 
+  select(1:10)
+Q4_2019_select <- Q4_2019 %>% 
+  select(1:10)
+Q1_2020_select <- Q1_2020_new %>% 
+  select(1:10)
+
+```
+
+The following code reveals that Q1_2020 use different notation to record `member` and `casual` customer than the other three data sets do. 
+```{r}
+unique(Q2_2019_select$usertype)
+
+unique(Q3_2019_select$usertype)
+ 
+unique(Q4_2019_select$usertype)
+
+unique(Q1_2020_select$usertype)
+```
+We know that in the three data sets of 2019, `Subscriber` matches `member` and `Customer` matches `casual`. So we decide to covert those values of `Subscriber` and `Customer` to `member` and `casual` to be consistent. 
+
+```{r}
+Q2_2019_select <- Q2_2019_select %>% 
+  mutate(usertype =case_when(
+    usertype == "Subscriber" ~ "member",
+    usertype == "Customer"   ~ "casual"
+  ))
+unique(Q2_2019_select$usertype)
+Q3_2019_select <- Q3_2019_select %>% 
+  mutate(usertype =case_when(
+    usertype == "Subscriber" ~ "member",
+    usertype == "Customer"   ~ "casual"
+  ))
+unique(Q3_2019_select$usertype)
+Q4_2019_select <- Q4_2019_select %>% 
+  mutate(usertype =case_when(
+    usertype == "Subscriber" ~ "member",
+    usertype == "Customer"   ~ "casual"
+  ))
+unique(Q4_2019_select$usertype)
+```
+
+
+
+
+##	Has your data been properly formatted?
+Some columns do not. 
+Note that the trip_id column in Q2_2019, Q3_2019 and Q4_2019 needs to be converted into character type to conform to the type of trip_id column in Q1_2020, so as to perform the combining operation. 
+
+```{r}
+Q2_2019_select <- Q2_2019_select %>% mutate(trip_id = as.character(trip_id))
+Q3_2019_select <- Q3_2019_select %>% mutate(trip_id = as.character(trip_id))
+Q4_2019_select <- Q4_2019_select %>% mutate(trip_id = as.character(trip_id))
+```
+
+Moreover, a closer look at the `tripduration` column of `Q1_20201 reveals it is of type `difftime`. The column needs to be converted to type `numeric`. 
+
+```{r}
+Q1_2020_select <- Q1_2020_select %>% 
+  mutate(tripduration = as.numeric(tripduration))
+```
+
+
+##	What surprises did you discover in the data?
+When trying to combining the four data sets, R reports error and prompts column types do not match. After performing above conversions, 
+now it's ready to 
+ combine the four data sets into one giant data set for further analysis.
+
+```{r}
+
+bike_share <- Q2_2019_select %>% 
+              bind_rows(Q3_2019_select) %>% 
+              bind_rows(Q4_2019_select) %>% 
+              bind_rows(Q1_2020_select)
+```
+To the new dataset `bike_share`, we next add a column called `day_of_week` of the `start_time` to prepare for further analysis. 
+```{r}
+bike_share <- bike_share %>% 
+  mutate ( day_of_week = weekdays(start_time))
+```
+
+
+
+## What trends or relationships did you find in the data?
+
+We shall computer on what week day there are the most number of rides. To this end, we need to  compute the mode of a vector, we first define a user-defined function to this end, as R does not have a built-in function to find the mode. 
+```{r}
+# Create the function.
+get_mode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}  # getmode only finds the first element with the most frequency
+
+get_mode_a <- function(v) {
+   uniqv <- unique(v)
+   tab <- tabulate(match(v, uniqv))
+   uniqv[tab==max(tab)]
+} # getmode_a finds all the elements with the most frequency when there are ties. Both functions works for numeric or character vectors. 
+
+# # Create the vector with numbers.
+# v <- c(2,1,2,3,1,2,3,4,1,5,5,3,2,3)
+# 
+# # Calculate the mode using the user function.
+# result <- getmode(v)
+# print(result)
+# 
+# # Create the vector with characters.
+# charv <- c("o","it","the","it","it","o","o")
+# 
+# # Calculate the mode using the user function.
+# result <- getmode(charv)
+# print(result)
+# result <- getmode1(charv)
+# print(result)
+```
+
+We now are ready to perform analysis. We first compute some simple descriptive statistics. 
+```{r}
+summary_analysis <- bike_share %>% 
+  summarize ("avg_ride_length (min)"= mean(tripduration)/60,
+             "max_ride_length (min)"=max(tripduration)/60,
+             most_riders_day=get_mode_a(day_of_week))
+summary_analysis
+```
+**Observation 1**: On average, the average ride length including both members and casual customers, is only 26 minutes. Wednesday has the most number of rides on average. 
+
+We next look at the difference between casual riders and subscribed members. We first look at  their difference in terms of ride length. 
+
+```{r }
+avg_ride_by_group <- bike_share %>% 
+  group_by(usertype) %>% 
+  summarize(
+  "avg_ride_length (min)" =mean(tripduration)/60)
+avg_ride_by_group
+```
+```{r}
+p <- avg_ride_by_group %>% ggplot(aes(x=usertype,y=`avg_ride_length (min)`,fill=usertype)) +
+   geom_bar(stat="identity",show.legend = FALSE) +
+  labs(title="Average ride length (in minute) by membership in the past year",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=round(`avg_ride_length (min)`,1)),vjust=1.5,color="white",size=4)
+print(p)
+```
+**Observation 2**: Subscription members on average have a much shorter ride length per ride compared to casual customers, who on average ride about 4 times as long as a subscription member does. This might attribute to that a casual customer mainly rent the bike for ad hoc purpose, e.g., recreational or an impromtu need,  and typically spend longer time than a subscription member who may use the bike for a routine riding with a fixed route, such as commuting. 
+
+We next analyze the data by weekday. 
+```{r}
+stat_by_weekday <- bike_share %>% 
+  group_by(day_of_week) %>% 
+  summarize(
+  "avg_ride_length (min)" =mean(tripduration)/60,
+  number_of_rides =length(trip_id)
+  ) %>% 
+  arrange(factor(day_of_week, level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")))
+
+stat_by_weekday
+```
+
+```{r}
+p <- stat_by_weekday %>%
+  mutate(day_of_week =factor(day_of_week,level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))) %>% 
+  arrange(day_of_week) %>% 
+  ggplot(aes(day_of_week,`avg_ride_length (min)`,fill=day_of_week)) +
+   geom_bar(stat="identity", 
+            show.legend = FALSE) +
+  labs(title="Average ride length (in minute) on a weekday in the past year",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=round(`avg_ride_length (min)`,1)),
+            vjust=1.5,color="white",size=4)
+
+print(p)
+```
+**Observation 3** On average, bike users ride longer in weekend than on a  week day. The average ride length is about 10 minutes longer in the weekend.  This may be due to that there are more casual customers in weekend than in weekdays and a casual customer on average rides for about 60 minutes per ride.
+
+```{r}
+p <- stat_by_weekday %>%
+  mutate(day_of_week =factor(day_of_week,level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))) %>% 
+  arrange(day_of_week) %>% 
+  ggplot(aes(x=day_of_week,y=number_of_rides,fill=day_of_week)) +
+   geom_bar(stat="identity",show.legend = FALSE) +
+  labs(title="Average number of rides by weekday in the past year",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=number_of_rides),vjust=1.5,color="white",size=4)
+
+print(p)
+```
+**Observation 4** The number of rides in the weekend is significantly fewer than that on a weekday, with Sunday having the least number of rides of ~558k and Saturday having ~663k. The number of rides on a week day is always above 700k.   
+There are no significant difference for the number of rides on weekdays. However, Wednesday has the most number of rides on average in a week, peaks at ~734k. 
+
+
+
+We next analyze the data set by membership on different weekdays. 
+
+```{r}
+stat_by_weekday_usertype <- bike_share %>% 
+  group_by(day_of_week,usertype) %>% 
+  summarize(
+  "avg_ride_length (min)" =mean(tripduration)/60,
+  number_of_rides =length(trip_id)
+    ) %>% 
+  arrange(factor(day_of_week, level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")))
+
+stat_by_weekday_usertype
+```
+
+We also calculate the percentage of each customer type on a given day. 
+```{r}
+stat_by_weekday_usertype <- stat_by_weekday_usertype %>% 
+  ungroup() %>% group_by(day_of_week) %>% 
+  mutate(usertype_pct = number_of_rides/sum(number_of_rides)*100)
+stat_by_weekday_usertype
+```
+
+
+
+
+```{r}
+p <- stat_by_weekday_usertype %>%
+  mutate(day_of_week =factor(day_of_week,level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))) %>% 
+  arrange(day_of_week,usertype) %>% 
+  ggplot(aes(day_of_week,`avg_ride_length (min)`,fill=usertype)) +
+   geom_bar(stat="identity", 
+            position = "dodge",
+            show.legend = TRUE) +
+  labs(title="Average ride length (in minute) of different users on a week day",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=round(`avg_ride_length (min)`,1)),
+            position = position_dodge(width = 1),
+            vjust=1.5,color="white",size=4)
+
+print(p)
+```
+**Observation 5** When diving into what type of customers rides longer on a week day, one can see that it appears subscription members ride about 1 to 1.7 minutes longer on average in weekend, while the casual customers do not ride significantly different than their overall average of 60 minutes per ride; except on Fridays, casual customers ride about 4 minutes longer, but about 5 minutes shorter on Saturday. Since we know the overall average ride length on weekend days are about 10 minutes longer than on a week day, this seems imply that there are more subscription members use the bike service on weekend, which is confirmed by the analysis below.  
+
+```{r}
+p <- stat_by_weekday_usertype %>%
+  mutate(day_of_week =factor(day_of_week,level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))) %>% 
+  arrange(day_of_week,usertype) %>% 
+  ggplot(aes(day_of_week,number_of_rides,fill=usertype)) +
+   geom_bar(stat="identity", 
+            #position = "dodge",
+            show.legend = TRUE) +
+  labs(title="Average number of rides of different users on a  weekday",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=number_of_rides),
+            position = "stack",
+            vjust=1.5,color="white",size=3)
+
+print(p)
+```
+
+```{r}
+p <- stat_by_weekday_usertype %>%
+  mutate(day_of_week =factor(day_of_week,level=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))) %>% 
+  arrange(day_of_week,usertype) %>% 
+  ggplot(aes(day_of_week,usertype_pct,fill=usertype)) +
+   geom_bar(stat="identity", 
+            #position = "dodge",
+            show.legend = TRUE) +
+  labs(title="Average  percentage of different users on a  weekday",
+       subtitle = "Q2 2019 -- Q1 2020") +
+  geom_text(aes(label=round(usertype_pct,1)),
+            position = "stack",
+            vjust=1.5,color="white",size=3)
+
+print(p)
+```
+**Observation 6** The above two bar chart indicate a surprising fact: there are much more rides used by subscription members on any weekday than casual members. This difference is even larger on a weekday. Although on average  more casual customers appear in weekend than those on a weekday, their numbers are still outnumbered by the number of subscription members. During the week, ~75-82% of rides are used by subscription members; while on a weekend day, there are still more than half (~55%) of rides are consumed by subscription members. 
+
+##	How will these insights help answer your business questions?
+
+The findings directly answer the business questions raised in the beginig. 
+
+## A summary of your analysis
+
+The findings are very important to see the difference in usage of bikes by casual customers and subscription members. Subscription members contributes about 75-82% of rides during a weekday and ~55% of rides in a weekend day. Casual customers increase significantly on a week end day, consuming ~45% of rides compared to only 18-25% of rides during a week day.
+
+In another word, on a week day, roughly there are four subscription members using the bike service for every casual customer; while on the weekend,  roughly there are 55 subscription members  versus 45 casual customers using the bike service among every 100 customers. 
+
+Another interesting finding is that a casual customer on average rides one hour per ride and a subscription member on average rides only 15 minutes per ride. 
+
+The third  interesting finding is that on average subscription members ride about 2 minutes longer in the weekend than on a week day. The percentage of subscription members use the bike service drops from ~80% on a week day to ~55% on a weekend day, but always outnumbers the casual customers. 
+
+The fourth interesting finding is that the percentage of  casual customers using the bike service doubles from ~20% on a weekday to ~ 45% on a weekend day. 
+
+
+
+
+# SHARE 
+
+
+
+## Were you able to answer the question of how annual members and casual riders use Cyclistic bikes differently?
+
+Yes. See the above summary. 
+
+##	What story does your data tell?
+See the summary analysis. 
+
+##	How do your findings relate to your original question?
+They are directly related. 
+
+##	Who is your audience? What is the best way to communicate with them?
+Managing team. Use a presentation with viz. 
+
+## Can data visualization help you share your findings?
+
+Yes, absolutely. 
+
+## Is your presentation accessible to your audience?
+
+Yes, Of course. 
+
+## (deliverable) Supporting visualizations and key findings
+See above. 
+
+# ACT 
+
+## What is your final conclusion based on your analysis?
+See the summary analysis. 
+
+##	How could your team and business apply your insights?
+
+##	What next steps would you or your stakeholders take based on your findings?
+
+##	Is there additional data you could use to expand on your findings?
+
+
+## Your top three recommendations based on your analysis
+
+1. Promotion should focus on increasing number of subscription members. 
+2. For a casual customer ride pass, the fee may consider to charge on a minimum 1 hour basis with half an hour incremental. 
+3. There can be a promotion to increase casual customers on a weekend day and the hourly charge may be slightly increased. 
+
+
+
+
+
